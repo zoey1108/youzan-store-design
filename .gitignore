@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+.DS_Store
+# 参考实现跑出来的产物
+assets/example-demo/html/
+assets/example-demo/主图/
+assets/example-demo/详情页/
+assets/example-demo/详情页切片/
+assets/example-demo/主页/
+assets/example-demo/个人中心/
