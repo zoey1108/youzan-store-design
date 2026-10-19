@@ -1,6 +1,6 @@
 # youzan-store-design
 
-一个**与具体 AI agent 无关**的 skill：把「有赞微商城的店铺装修 + 商品上架」整套流程交给 AI agent 做。Claude Code、Codex、Cursor、Gemini CLI，或你自己基于 LLM 搭的 agent 都能用。
+一个**通用** skill：把「有赞微商城的店铺装修 + 商品上架」整套流程交给 AI agent 做。Claude Code、Codex、Cursor、Gemini CLI，或你自己基于 LLM 搭的 agent 都能用。
 
 - **本地出图**：从 PRD 或商品资料提炼商品表与文案禁区，用 HTML + 无头浏览器批量生成商品主图、商详长图、首页和个人中心配图，渲染后自查再交付。
 - **后台操作**：用任意浏览器自动化能力（agent 自带浏览器工具、浏览器扩展、Playwright/Puppeteer/CDP）操作已登录的有赞商家后台：创建或编辑商品（主图、详情、卖点、类目、留言、限购、售后、仓库或上架），搭建并发布店铺主页、个人中心，调整购物车与底部导航。
