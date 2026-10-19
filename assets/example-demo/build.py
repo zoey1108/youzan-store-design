@@ -6,17 +6,18 @@
 用法：python3 build.py            生成全部主图 + 详情页
      python3 build.py nianka     只生成某个商品
 """
-import subprocess
 import sys
 from pathlib import Path
 
-from PIL import Image
-
 ROOT = Path(__file__).resolve().parent
+# 渲染工具：优先用 skill 自带的 scripts/render_tools.py；把示例复制到别处时，把 render_tools.py 一起复制到同目录即可
+for _p in (ROOT, ROOT.parents[1] / "scripts"):
+    sys.path.insert(0, str(_p))
+from render_tools import shoot, trim_bottom  # noqa: E402
+
 HTML_DIR = ROOT / "html"
 MAIN_DIR = ROOT / "主图"
 DETAIL_DIR = ROOT / "详情页"
-CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
 
 AI_FEATURES = ["智能问答", "作文批改", "语音讲解", "练习生成"]
 FREE_FEATURES = ["学习计划", "错题收藏", "每日一练", "单词本", "打印"]
@@ -63,7 +64,7 @@ def icon(name, size=40, stroke="currentColor"):
 BASE_CSS = """
 *{box-sizing:border-box;margin:0;padding:0}
 html{background:#010203}
-body{font-family:'PingFang SC','Hiragino Sans GB',sans-serif;color:#5C3A1E;-webkit-font-smoothing:antialiased}
+body{font-family:'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC','Source Han Sans SC','WenQuanYi Micro Hei',sans-serif;color:#5C3A1E;-webkit-font-smoothing:antialiased}
 :root{--o1:#FFA040;--o2:#FF6B24;--o-line:#FF844C;--o-bg:#FFF0E8;--b1:#5C3A1E;--b2:#8C5A3C;--b3:#A8806A;--page:#F5F6F8;--gold1:#FFF1D0;--gold2:#E6BC74}
 .brand{display:flex;align-items:center;gap:12px;font-weight:600;color:var(--b1)}
 .logo{display:inline-grid;place-items:center;border-radius:12px;background:linear-gradient(135deg,var(--o1),var(--o2));color:#fff;font-weight:800}
@@ -402,23 +403,7 @@ def detail_pack(p):
 
 
 # ---------- 渲染 ----------
-def shoot(html_path, png_path, width, height, scale):
-    subprocess.run([CHROME, "--headless=new", "--disable-gpu", "--hide-scrollbars",
-                    f"--window-size={width},{height}", f"--force-device-scale-factor={scale}",
-                    f"--screenshot={png_path}", html_path.as_uri()],
-                   check=True, capture_output=True)
-
-
-def trim_bottom(png_path):
-    """详情页高度不固定：截一张足够高的图，再裁掉底部的哨兵色 #010203。"""
-    im = Image.open(png_path).convert("RGB")
-    w, h = im.size
-    px = im.load()
-    y = h - 1
-    while y > 0 and all(px[x, y] == (1, 2, 3) for x in range(0, w, 7)):
-        y -= 1
-    im.crop((0, 0, w, y + 1)).save(png_path, optimize=True)
-    return im.size[0], y + 1
+# shoot / trim_bottom 来自 render_tools（跨平台找浏览器，详情页靠哨兵色 #010203 裁掉底部空白）
 
 
 def build(only=None):

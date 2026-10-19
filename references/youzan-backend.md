@@ -1,6 +1,6 @@
 # 有赞商家后台操作手册（实测版）
 
-基于 2026-10 的有赞微商城后台（zent 组件库）。界面可能改版，坐标仅供参考；优先用 `find` / `javascript_tool` 按文字定位，坐标要先截图确认。
+基于 2026-10 的有赞微商城后台（zent 组件库）。界面可能改版，文中坐标基于 1454 宽的浏览器视口，仅供参考。优先在页面里执行 JS、按文字定位元素；需要按坐标点击时，先截图确认。下文的「执行 JS」「截图」「真实键入」「填文件」指你的浏览器自动化工具里对应的操作（见 SKILL.md 文末的「能力对照」）。
 
 ## 目录
 1. 通用技巧
@@ -17,7 +17,7 @@
 
 ## 1. 通用技巧
 
-- **React 受控输入框**：用脚本赋值（`el.value=...` + 派发 input 事件）有时只改了 DOM，没进表单状态（症状：预览不变、保存时提示「请输入库存」）。可靠写法是先用脚本聚焦并全选，再用 computer `type` 真实键入：
+- **React 受控输入框**：用脚本赋值（`el.value=...` + 派发 input 事件）有时只改了 DOM，没进表单状态（症状：预览不变、保存时提示「请输入库存」）。可靠写法是先用脚本聚焦并全选，再用**真实键盘输入**（如 Playwright `keyboard.type`、CDP `Input.insertText`，或浏览器工具的 type 动作）：
   ```js
   window.__f=i=>{const e=[...document.querySelectorAll('input:not([type=file]):not([type=hidden]), textarea')][i];e.scrollIntoView({block:'center'});e.focus();e.select();return e.placeholder};
   ```
@@ -31,7 +31,7 @@
 - **复选框用脚本点**：留言的「必填」等复选框，用坐标点击容易在布局变化后误点到旁边的「删除」。用 `[...document.querySelectorAll('input[type=checkbox]')].find(c=>c.closest('label')?.innerText.trim()==='必填')`，判断没勾再 `.click()`。
 - **#hash 跳转不会重新加载**：`/v4/goods/edit#/id=A` 跳到 `#/id=B` 时，单页应用可能还停在 A 的表单上，接着操作会改错商品。每次换商品前先跳到别的页面（如商品列表），或者在动手前读一次商品名核对。
 - **满意度调查浮层**会挡住列表右下角，先点它的 ×。
-- 有赞部分按钮用 `window.open` 开新窗口（如个人中心的「编辑」）。新窗口不在 Claude 的标签页分组里，可以先拦截取到地址：
+- 有赞部分按钮用 `window.open` 开新窗口（如个人中心的「编辑」）。新窗口可能不受你的自动化会话控制，可以先拦截，拿到地址后在当前标签页打开：
   ```js
   const o=window.open; window.__opened=[]; window.open=u=>{window.__opened.push(String(u));return null};
   /* 点击按钮 */ window.open=o; window.__opened
@@ -42,7 +42,7 @@
 所有图片入口（商品图、详情图、装修组件）都会先弹「我的图片」素材库：
 
 1. 点左上「上传图片」标签切到上传表单（商品页大约在 (331,135)，个人中心组件里的位置不同，先截图）
-2. 用 `find` 找「上传图片弹窗中的本地图片 file input」拿到 ref → `file_upload`
+2. 定位弹窗里「本地图片」对应的 `input[type=file]`，把本地文件填进去（Playwright `setInputFiles` / CDP `DOM.setFileInputFiles` / 浏览器工具的上传动作）。不要点它，点了会弹出系统文件选择框，自动化操作不了。
 3. 点「确定」（商品页大约在 (1088,404)，装修页大约在 (1093,603)）
 
 注意：
@@ -121,12 +121,12 @@
 
 - 交易设置：`/v4/setting/team#trade` → 基础设置 → 「购物车：开启/关闭」→ 底部「保存」。关闭后买家只能单独购买结算，商品页底部只剩「立即购买」。后台商品编辑页的预览里不会体现这个变化。刷新后读单选状态核对。
 - 底部导航：`/v4/deco/shopnav-config#bottom` → 导航卡片右上角垃圾桶删除 → 「保存」→ 提示「保存导航成功」。
-- **这个页面一直挂着「离开前提醒」**，保存后依然在。离开或关闭标签页都会被拦住，脚本也去不掉。核对时另开一个标签页加载同一地址；旧标签页让用户自己关掉（Chrome 问「离开此网站？」时点「离开」）。不要反复重试。
+- **这个页面一直挂着「离开前提醒」**，保存后依然在。离开或关闭标签页都会被拦住，脚本也去不掉。核对时另开一个标签页加载同一地址；旧标签页让用户自己关掉（Chrome 问「离开此网站？」时点「离开」）。如果你的工具能处理 beforeunload 对话框（如 Playwright 的 `page.on('dialog', d => d.accept())`），也可以自己确认离开。不要反复重试。
 
 ## 9. 截长图给用户看
 
 编辑器画布一屏装不下时：
 
 1. 找到滚动容器（主页是 `.preview-wrap`，个人中心是 `document.scrollingElement`），记下 `scrollHeight`。
-2. 依次设 `scrollTop = 0, 视口高, 2×视口高…`，每次用 computer `zoom` 截手机画布区域（`save_to_disk: true`，**不要传 scale**，否则存下来的是缩小图）。
-3. 用 PIL 按 `scrollTop` 差值换算像素偏移（zoom 输出是 2 倍），裁掉重叠部分后竖向拼接，存到项目目录再用 SendUserFile 发给用户。
+2. 依次设 `scrollTop = 0, 视口高, 2×视口高…`，每次截取手机画布区域（只截画布所在的矩形，尽量用高 DPR 原尺寸，不要压缩成缩略图）。
+3. 按 `scrollTop` 差值乘以截图倍率换算像素偏移，裁掉重叠部分，用 `scripts/render_tools.py` 的 `stitch_vertical` 竖向拼接，存到项目目录后交给用户。

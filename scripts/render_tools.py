@@ -1,4 +1,9 @@
-"""有赞商品视觉的通用渲染工具：HTML → PNG（本机 Chrome 无头模式）、裁掉长图底部空白、切片、拼总览。
+"""有赞商品视觉的通用渲染工具：HTML → PNG（无头浏览器）、裁掉长图底部空白、切片、拼总览、拼长图。
+
+支持 macOS / Linux / Windows。浏览器查找顺序：
+  1. 环境变量 CHROME_PATH
+  2. 常见安装位置和 PATH 里的 Chrome / Chromium / Edge
+  3. 以上都没有时，退回 Playwright（pip install playwright && playwright install chromium）
 
 用法（在你的生成器里）：
     import sys; sys.path.insert(0, "<skill>/scripts")
@@ -8,20 +13,71 @@
 这样截一张足够高的图后，trim_bottom 能准确裁掉多余部分。
 """
 import math
+import os
+import shutil
 import subprocess
+import sys
 from pathlib import Path
 
 from PIL import Image
 
-CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
 SENTINEL = (1, 2, 3)
+
+_CANDIDATES = {
+    "darwin": [
+        "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+        "/Applications/Chromium.app/Contents/MacOS/Chromium",
+        "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge",
+    ],
+    "win32": [
+        r"C:\Program Files\Google\Chrome\Application\chrome.exe",
+        r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
+        r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe",
+        r"C:\Program Files\Microsoft\Edge\Application\msedge.exe",
+    ],
+}
+_PATH_NAMES = ["google-chrome", "google-chrome-stable", "chromium", "chromium-browser", "chrome", "msedge",
+               "microsoft-edge"]
+
+
+def find_chrome():
+    """返回可用的 Chrome/Chromium/Edge 路径；找不到返回 None。"""
+    env = os.environ.get("CHROME_PATH")
+    if env and Path(env).exists():
+        return env
+    for p in _CANDIDATES.get(sys.platform, []):
+        if Path(p).exists():
+            return p
+    for name in _PATH_NAMES:
+        hit = shutil.which(name)
+        if hit:
+            return hit
+    return None
+
+
+def _shoot_playwright(html_path, png_path, width, height, scale):
+    try:
+        from playwright.sync_api import sync_playwright
+    except ImportError as e:
+        raise RuntimeError("没找到 Chrome/Chromium/Edge，也没装 Playwright。请安装浏览器，或设置 CHROME_PATH，"
+                           "或执行 pip install playwright && playwright install chromium") from e
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        page = browser.new_page(viewport={"width": width, "height": height}, device_scale_factor=scale)
+        page.goto(Path(html_path).resolve().as_uri())
+        page.wait_for_load_state("networkidle")
+        page.screenshot(path=str(png_path))
+        browser.close()
 
 
 def shoot(html_path, png_path, width, height, scale=2):
-    """用 Chrome 无头模式截图。width/height 为 CSS 像素，输出尺寸 = 尺寸 × scale。"""
-    subprocess.run([CHROME, "--headless=new", "--disable-gpu", "--hide-scrollbars",
+    """无头浏览器截图。width/height 为 CSS 像素，输出尺寸 = 尺寸 × scale。"""
+    chrome = find_chrome()
+    if not chrome:
+        return _shoot_playwright(html_path, png_path, width, height, scale)
+    subprocess.run([chrome, "--headless=new", "--disable-gpu", "--hide-scrollbars", "--no-sandbox",
                     f"--window-size={width},{height}", f"--force-device-scale-factor={scale}",
-                    f"--screenshot={png_path}", Path(html_path).resolve().as_uri()],
+                    f"--screenshot={Path(png_path).resolve()}", Path(html_path).resolve().as_uri()],
                    check=True, capture_output=True)
 
 

@@ -6,7 +6,7 @@
 - `homepage.py`：首页横幅、会员权益条、购买须知（750 宽）。
 - `usercenter.py`：个人中心头部背景（960×440）、到账说明广告位（710×200）、常见问题（750 宽）。
 
-`homepage.py` 和 `usercenter.py` 会 `from build import ...`，三个文件要放在同一目录。需要 macOS + Google Chrome + Pillow（`pip install pillow`）。
+`homepage.py` 和 `usercenter.py` 会 `from build import ...`，三个文件要放在同一目录。渲染用 skill 的 `scripts/render_tools.py`（跨平台自动找 Chrome/Chromium/Edge，找不到退回 Playwright）；把示例复制到别处时，把 `render_tools.py` 一起复制到同目录。需要 Pillow（`pip install pillow`）。
 
 ```bash
 python3 build.py        # 生成 主图/ 详情页/ html/
